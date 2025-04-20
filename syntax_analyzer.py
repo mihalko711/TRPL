@@ -50,7 +50,7 @@ class SyntaxAnalyzer():
                 self.parse_const()
 
     def parse_command_sequence(self):
-        while self.curr_token.type in ('FOR', 'IF', 'READ', 'WRITE', 'ID','VAR'):
+        while self.curr_token.type in ('FOR', 'IF', 'READ', 'WRITE', 'ID'):
             self.parse_command()
 
     def parse_command(self):
@@ -69,26 +69,31 @@ class SyntaxAnalyzer():
 
     def parse_var(self):
         self.expect('VAR')
-        self.parse_variable_list()
+        self.parse_variable_declaration()
         self.expect('SEMI')
 
-    def parse_variable_list(self):
-        while self.curr_token.type == 'ID':
-            if self.tokens[self.pos + 1].type == 'EQ':
-                self.parse_assignment()
+    def parse_variable_declaration(self):
+        self.parse_variable_list()
+        self.expect(':')
+        if(self.curr_token.type in ('INTEGER', 'BOOLEAN')):
+            self.expect(';')
+            if self.curr_token.type == 'ID':
+                self.parse_variable_declaration()
             else:
-                self.expect('ID')
+                raise SyntaxError(f"Expected some type, got {self.curr_token.type}!")
 
-            if self.curr_token.type == 'COMMA':
-                self.advance()
-            elif self.curr_token.type == 'SEMI':
-                break
-            else:
-                raise SyntaxError(f"Expected 'SEMI' or 'COMA', got {self.curr_token.type}!")
+    def parse_variable_list(self):
+        self.expect('ID')
+        if self.curr_token.type == 'COMA':
+            self.parse_variable_list()
 
     def parse_expression(self):
-        self.parse_operand()
-        while self.curr_token.type in ('PLUS', 'MINUS', 'MULT', 'DEL' ,'NE','LE','GE', 'LT','GT'):
+        if self.curr_token.type in ('ID', 'NUMBER'):
+            self.parse_operand()
+            while self.curr_token.type in ('PLUS', 'MINUS', 'MULT', 'DEL' ,'NE','LE','GE', 'LT','GT'):
+                self.advance()
+                self.parse_operand()
+        elif self.curr_token.type in ('-','NOT'):
             self.advance()
             self.parse_operand()
 
@@ -105,18 +110,21 @@ class SyntaxAnalyzer():
 
     def parse_assignment(self):
         self.expect('ID')
+        self.expect(':')
         self.expect('EQ')
         self.parse_expression()
 
     def parse_const(self):
         self.expect('CONST')
+        self.parse_const_declaration()
+
+    def parse_const_declaration(self):
         self.expect('ID')
         self.expect('EQ')
-        if self.curr_token in ('NUMBER', 'STRING', 'TRUE', 'FALSE'):
-            self.advance()
-            self.expect('SEMI')
-        else:
-            raise SyntaxError(f"Expected 'NUMBER', 'STRING', 'TRUE' or 'FALSE', got {self.curr_token.type}!")
+        self.parse_literal()
+        self.expect('sEMI')
+        if self.curr_token.type == 'ID':
+            self.parse_const_declaration()
 
 
     def parse_write(self):
