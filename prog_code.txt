@@ -1,0 +1,8 @@
+program DemoProgram;
+
+var
+  i, j, k: Boolean;
+
+begin
+    l := i * i + j / k + (k * j - i) := o;
+end.

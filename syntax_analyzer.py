@@ -21,7 +21,7 @@ class SyntaxAnalyzer():
         if self.curr_token.type == type_:
             self.advance()
         else:
-            raise SyntaxError(f'Expected {type_}, got {self.curr_token.type}!')
+            raise SyntaxError(f'Expected {type_}, got {self.curr_token.type} on pos: {self.pos}!')
 
     def advance(self):
         # передвигаем позицию, меняем текущий токен
@@ -32,6 +32,7 @@ class SyntaxAnalyzer():
     def parse_program(self):
         self.expect('PROGRAM') # проверка ключевого слова program
         self.expect('ID') # проверка идентификатора(сделана в лексере)
+        self.expect('SEMI')
         self.parse_declaration()
         self.expect('BEGIN') # проверка ключевого слова begin
         self.parse_command_sequence()
@@ -43,17 +44,18 @@ class SyntaxAnalyzer():
         self.expect('ID')
 
     def parse_declaration(self):
-        while self.curr_token.type in ('VAR','CONST'):
+        while self.curr_token.type in ('VAR','CONST'): #объявление начинается с var или const
             if self.curr_token.type == 'VAR':
                 self.parse_var()
             else:
                 self.parse_const()
 
     def parse_command_sequence(self):
-        while self.curr_token.type in ('FOR', 'IF', 'READ', 'WRITE', 'ID'):
+        while self.curr_token.type in ('FOR', 'IF', 'READ', 'WRITE', 'ID'): #возможные начала команд
             self.parse_command()
 
     def parse_command(self):
+        # для каждой команды своя процедура парсинга
         if self.curr_token.type == 'FOR':
             self.parse_for()
         elif self.curr_token.type == 'IF':
@@ -62,59 +64,66 @@ class SyntaxAnalyzer():
             self.parse_read()
         elif self.curr_token.type == 'WRITE':
             self.parse_write()
-        elif self.curr_token.type == 'VAR':
-            self.parse_var()
         else:
             self.parse_assignment()
 
     def parse_var(self):
+        # отедляем ключевое слово и парсим объявление
         self.expect('VAR')
         self.parse_variable_declaration()
-        self.expect('SEMI')
 
     def parse_variable_declaration(self):
-        self.parse_variable_list()
-        self.expect(':')
-        if(self.curr_token.type in ('INTEGER', 'BOOLEAN')):
-            self.expect(';')
+        self.parse_variable_list() # сначала у нас список переменных
+        self.expect('COLON')
+        # потом тип
+        if(self.curr_token.type in ('INTEGER', 'BOOLEAN', 'STRING')):
+            self.advance()
+            self.expect('SEMI')
             if self.curr_token.type == 'ID':
                 self.parse_variable_declaration()
-            else:
-                raise SyntaxError(f"Expected some type, got {self.curr_token.type}!")
 
     def parse_variable_list(self):
         self.expect('ID')
-        if self.curr_token.type == 'COMA':
+        # читаем список  идентификаторов через запятую
+        if self.curr_token.type == 'COMMA':
+            self.advance()
             self.parse_variable_list()
 
     def parse_expression(self):
-        if self.curr_token.type in ('ID', 'NUMBER'):
-            self.parse_operand()
-            while self.curr_token.type in ('PLUS', 'MINUS', 'MULT', 'DEL' ,'NE','LE','GE', 'LT','GT'):
-                self.advance()
-                self.parse_operand()
-        elif self.curr_token.type in ('-','NOT'):
+        self.parse_term()
+        while self.curr_token.type in ('PLUS', 'MINUS', 'NE', 'LE', 'GE', 'LT', 'GT','EQ','OR','AND'):
             self.advance()
-            self.parse_operand()
+            self.parse_term()
 
-    def parse_operand(self):
-        if self.curr_token.type in ('ID', 'STRING', 'NUMBER'):
+    def parse_term(self):
+        self.parse_factor()
+        while self.curr_token.type in ('MULT', 'DEL'):
             self.advance()
+            self.parse_factor()
+
+    def parse_factor(self):
+        if self.curr_token.type in ('MINUS', 'NOT'):
+            self.advance()
+            self.parse_factor()
         elif self.curr_token.type == 'LPAREN':
             self.advance()
             self.parse_expression()
             self.expect('RPAREN')
+        elif self.curr_token.type in ('ID', 'NUMBER', 'STRING'):
+            self.advance()
         else:
-            print(f"curr_token.type = {self.curr_token.type}, curr_token.type == 'NUMBER': {self.curr_token.type == 'NUMBER'}")
-            raise SyntaxError(f"Expected 'LPAREN' or 'ID', 'STRING', 'NUMBER', got {self.curr_token.type}!")
+            raise SyntaxError(f"Unexpected token in expression: {self.curr_token.type}")
 
     def parse_assignment(self):
+        # достаточно простое правило
         self.expect('ID')
-        self.expect(':')
+        self.expect('COLON')
         self.expect('EQ')
         self.parse_expression()
+        self.expect('SEMI')
 
     def parse_const(self):
+        # почти аналогично анализу var
         self.expect('CONST')
         self.parse_const_declaration()
 
@@ -122,29 +131,35 @@ class SyntaxAnalyzer():
         self.expect('ID')
         self.expect('EQ')
         self.parse_literal()
-        self.expect('sEMI')
+        self.expect('SEMI')
         if self.curr_token.type == 'ID':
             self.parse_const_declaration()
+
+    def parse_literal(self):
+        if self.curr_token.type in  ('ID', 'STRING', 'NUMBER', 'TRUE', 'FALSE'):
+            self.advance()
+        else:
+            raise SyntaxError(f"Expected 'ID', 'STRING', 'NUMBER', 'TRUE' or 'FALSE', got {self.curr_token.type} on pos: {self.pos}!")
 
 
     def parse_write(self):
         self.expect('WRITE')
-        self.expect('LRAPEN')
-        while self.curr_token.type in ('STRING', 'NUMBER', 'ID'):
+        self.expect('LPAREN')
+        while self.curr_token.type in ('STRING', 'NUMBER', 'ID'): # допустимые аргуменьы функции
             self.advance()
-            if self.curr_token == 'COMMA':
+            if self.curr_token.type == 'COMMA':
                 self.advance()
-        self.expect('PRAPEN')
+        self.expect('RPAREN')
         self.expect('SEMI')
 
     def parse_read(self):
         self.expect('READ')
-        self.expect('LRAPEN')
-        while self.curr_token.type == 'ID':
+        self.expect('LPAREN')
+        while self.curr_token.type == 'ID': # допустимый аргумент функции
             self.advance()
-            if self.curr_token == 'COMMA':
+            if self.curr_token.type == 'COMMA':
                 self.advance()
-        self.expect('PRAPEN')
+        self.expect('RPAREN')
         self.expect('SEMI')
 
     def parse_if_else(self):
@@ -163,24 +178,26 @@ class SyntaxAnalyzer():
             self.expect('SEMI')
 
     def parse_for(self):
+        # заголов цикла for в стиле C
         self.expect('FOR')
-        self.expect('LRAPEN')
+        self.expect('LPAREN')
         if self.curr_token.type == 'VAR':
             self.expect('VAR')
             self.expect('ID')
+            self.expect('COLON')
             self.expect('EQ')
             self.parse_expression()
+            self.expect('SEMI')
         elif self.curr_token.type == 'ID':
-            self.expect('ID')
-        self.expect('SEMI')
+            self.parse_assignment()
         self.parse_expression()
         self.expect('SEMI')
         self.parse_expression()
-        self.expect('SEMI')
-        self.expect('LRAPEN')
+        self.expect('RPAREN')
         self.expect('BEGIN')
         self.parse_command_sequence()
         self.expect('END')
+        self.expect('SEMI')
 
 
 class Tokenizer:
@@ -192,7 +209,7 @@ class Tokenizer:
         # множество ключевх слов
         self.KEYWORDS  = {
             'program' , 'var', 'const', 'begin', 'end', 'write', 'read', 'if',
-            'else', 'then', 'for', 'string', 'true', 'false'
+            'else', 'then', 'for', 'string', 'true', 'false', 'Integer', 'Boolean','and','or','not'
         }
         # описание токенов регулярними виражениями
         token_specs = [
@@ -201,6 +218,7 @@ class Tokenizer:
             ('LPAREN', r'\('),
             ('RPAREN', r'\)'),
             ('COMMA', r','),
+            ('COLON', r':'),
             ('SEMI', r';'),
             ('DOT', r'\.'),
             ('PLUS', r'\+'),

@@ -1,11 +1,18 @@
 from syntax_analyzer import Tokenizer,SyntaxAnalyzer
 
 def main():
-    kop = Tokenizer()
+    tok = Tokenizer()
 
-    print(kop.tokenize('program main\nvar x = 5, y = 67;\nbegin if x then var p = 1; end.'))
+    with open('prog_code.txt', 'r', encoding='utf-8') as f:
+        prog_code = f.read()
+    print(prog_code)
 
-    syn_an = SyntaxAnalyzer('program main\nvar x = 5, y = 67;\nbegin if x then begin  var p = 1; end; end')
+    tokenized = tok.tokenize(prog_code)
+
+    for i in range(len(tokenized)):
+        print(f"{i}: {tokenized[i]}")
+
+    syn_an = SyntaxAnalyzer(prog_code)
     print(f"The result of check is {syn_an.parse()}")
 
 
