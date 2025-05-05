@@ -1,0 +1,12 @@
+program DemoProgram;
+
+var
+  i, j, k: Boolean;
+
+begin
+    if (a>0) then
+    begin
+        write("Value of i:",i);
+        a:=a+1;
+    end;
+end.
